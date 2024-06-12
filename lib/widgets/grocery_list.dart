@@ -29,32 +29,46 @@ class _GroceryListState extends State<GroceryList> {
   void _loadItems() async {
     var url = Uri.https('shopping-list-bfd27-default-rtdb.firebaseio.com', 'shopping-list.json');
 
-    final response = await http.get(url);
+    try {
+      final response = await http.get(url);
 
-    if(response.statusCode >= 400) {
-      setState(() {
-        _error = 'Faild to fetch data. PLease, try again later.';
-      });
-    }
-    
-    if(response.statusCode == 200) {
-      final Map<String, dynamic> listLoaded = json.decode(response.body);
-      final List<GroceryItem> loadedList = [];
-
-      for(final item in listLoaded.entries) {
-        var category = categories.entries.firstWhere((catElement) => catElement.value.title == item.value['category']).value;
-
-        loadedList.add(GroceryItem(
-          id: item.key,
-          name: item.value['name'],
-          quantity: item.value['quantity'],
-          category: category,
-        ));
+      if(response.statusCode >= 400) {
+        setState(() {
+          _error = 'Faild to fetch data. PLease, try again later.';
+        });
       }
 
+      if(response.body == 'null') {
+        setState(() {
+          _isLoading = false;
+        });
+        
+        return;
+      }
+      
+      if(response.statusCode == 200) {
+        final Map<String, dynamic> listLoaded = json.decode(response.body);
+        final List<GroceryItem> loadedList = [];
+
+        for(final item in listLoaded.entries) {
+          var category = categories.entries.firstWhere((catElement) => catElement.value.title == item.value['category']).value;
+
+          loadedList.add(GroceryItem(
+            id: item.key,
+            name: item.value['name'],
+            quantity: item.value['quantity'],
+            category: category,
+          ));
+        }
+
+        setState(() {
+          _groceryItems = loadedList;
+          _isLoading = false;
+        });
+      }
+    } catch (_err) {
       setState(() {
-        _groceryItems = loadedList;
-        _isLoading = false;
+        _error = 'Something went wrong. Please, try again later.';
       });
     }
   } 
@@ -75,10 +89,22 @@ class _GroceryListState extends State<GroceryList> {
     });
   }
 
-  void _removeItem(GroceryItem groceryItem) {
+  void _removeItem(GroceryItem groceryItem) async {
+    final _index = _groceryItems.indexOf(groceryItem);
+    
     setState(() {
       _groceryItems.remove(groceryItem);
     });
+
+    var url = Uri.https('shopping-list-bfd27-default-rtdb.firebaseio.com', 'shopping-list/${groceryItem.id}.json');
+    
+    final response = await http.delete(url);
+    
+    if(response.statusCode >= 400) {
+      setState(() {
+        _groceryItems.insert(_index, groceryItem);
+      });
+    }
   }
 
   @override
